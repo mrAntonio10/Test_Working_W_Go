@@ -1,10 +1,8 @@
 package main
 
 import (
-	"first/internal/controller"
-	"first/internal/core"
+	"first/internal/bootstrap"
 	"first/internal/middleware"
-	"first/internal/repository"
 	"first/pkg/db"
 	"log"
 
@@ -14,35 +12,31 @@ import (
 
 func main() {
 	// 1. Connection to PostgreSQL
+	// 1. Connection to PostgreSQL
 	// Replace the DSN with your actual credentials
-	dsn := "postgres://user:password@localhost:5432/dbname?sslmode=disable"
+	dsn := "postgres://marcoro:4708@localhost:5432/postgres?sslmode=disable"
 	database, err := db.NewPostgresDB(dsn)
 	if err != nil {
 		log.Fatalf("Could not connect to database: %v", err)
 	}
-	defer database.Close()
+	// defer database.Close() // GORM manages connection pooling
 
-	// 2. Initialize Dependency Injection (Repo -> Service -> Controller)
-	userRepo := repository.NewPostgresUserRepository(database)
-	userService := core.NewUserService(userRepo)
-	userController := controller.NewUserController(userService)
-
-	// 3. Setup Echo Server
+	// 2. Setup Echo Server
 	e := echo.New()
 	e.Use(echoMiddleware.Logger())
 	e.Use(echoMiddleware.Recover())
 
-	// 4. Configure TOON Middleware/Serializer
-	// This replaces the default JSON serializer with our TOON serializer
+	// 3. Configure TOON Middleware/Serializer
 	e.JSONSerializer = &middleware.ToonSerializer{}
 
-	// 5. Register Routes
-	userController.RegisterRoutes(e)
+	// 4. Initialize Application Modules (Bootstrap)
+	// This keeps main() clean and scalable.
+	bootstrap.InitApp(e, database)
 
 	e.GET("/", func(c echo.Context) error {
 		return c.String(200, "Server is running with TOON support!")
 	})
 
-	// 6. Start Server
+	// 5. Start Server
 	e.Logger.Fatal(e.Start(":1323"))
 }

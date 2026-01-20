@@ -1,24 +1,20 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 
-	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-// NewPostgresDB initializes a connection to the PostgreSQL database.
-func NewPostgresDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dsn)
+// NewPostgresDB initializes a connection to the PostgreSQL database using GORM.
+func NewPostgresDB(dsn string) (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database connection: %w", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	log.Println("Successfully connected to PostgreSQL")
+	log.Println("Successfully connected to PostgreSQL via GORM")
 	return db, nil
 }
