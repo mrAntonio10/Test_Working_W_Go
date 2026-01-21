@@ -14,7 +14,7 @@ func main() {
 	// 1. Connection to PostgreSQL
 	// 1. Connection to PostgreSQL
 	// Replace the DSN with your actual credentials
-	dsn := "postgres://marcoro:4708@localhost:5432/postgres?sslmode=disable"
+	dsn := "postgres://postgres:4708@localhost:5432/postgres?sslmode=disable"
 	database, err := db.NewPostgresDB(dsn)
 	if err != nil {
 		log.Fatalf("Could not connect to database: %v", err)
