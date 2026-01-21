@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	m "first/internal/model"
 	"first/internal/repository"
 	"first/pkg/utils"
@@ -36,8 +35,15 @@ func (s *userServiceImpl) GetUsersPaginated(page, pageSize int) (*utils.Paginate
 
 func (s *userServiceImpl) CreateUser(name, email, password string) error {
 	// Business logic: Validation
-	if name == "" || email == "" || password == "" {
-		return errors.New("name, email, and password are required")
+	// Business logic: Validation
+	if err := utils.ValidateNotEmpty(name, "Name"); err != nil {
+		return err
+	}
+	if err := utils.ValidateNotEmpty(email, "Email"); err != nil {
+		return err
+	}
+	if err := utils.ValidateNotEmpty(password, "Password"); err != nil {
+		return err
 	}
 
 	// Business logic: Hashing
