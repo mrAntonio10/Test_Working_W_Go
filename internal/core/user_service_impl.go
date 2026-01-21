@@ -35,9 +35,15 @@ func (s *userServiceImpl) GetUsersPaginated(page, pageSize int) (*utils.Paginate
 
 func (s *userServiceImpl) CreateUser(name, email, password string) error {
 	// Business logic: Validation
-	if name == "" || email == "" || password == "" {
-		// In a real app, define custom errors
-		return s.repo.Create(name, email, password) // Or error out. Let's just pass through for now or return error.
+	// Business logic: Validation
+	if err := utils.ValidateNotEmpty(name, "Name"); err != nil {
+		return err
+	}
+	if err := utils.ValidateNotEmpty(email, "Email"); err != nil {
+		return err
+	}
+	if err := utils.ValidateNotEmpty(password, "Password"); err != nil {
+		return err
 	}
 
 	// Business logic: Hashing
