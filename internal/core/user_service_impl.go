@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	m "first/internal/model"
 	"first/internal/repository"
 	"first/pkg/utils"
@@ -36,8 +37,7 @@ func (s *userServiceImpl) GetUsersPaginated(page, pageSize int) (*utils.Paginate
 func (s *userServiceImpl) CreateUser(name, email, password string) error {
 	// Business logic: Validation
 	if name == "" || email == "" || password == "" {
-		// In a real app, define custom errors
-		return s.repo.Create(name, email, password) // Or error out. Let's just pass through for now or return error.
+		return errors.New("name, email, and password are required")
 	}
 
 	// Business logic: Hashing
