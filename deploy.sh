@@ -42,62 +42,55 @@ fi
 echo -e "${GREEN}[OK] .env file found${NC}"
 echo ""
 
-# Step 1: Stop and remove existing container
-echo -e "${BLUE}[1/5] Stopping and removing old container...${NC}"
-if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-    docker stop ${CONTAINER_NAME} 2>/dev/null || true
-    docker rm ${CONTAINER_NAME} 2>/dev/null || true
-    echo -e "${GREEN}✓ Old container removed${NC}"
+# Determine docker compose command
+COMPOSE_CMD=""
+if command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+elif docker compose version &> /dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
 else
-    echo -e "${YELLOW}  No existing container found${NC}"
-fi
-echo ""
-
-# Step 2: Remove old image
-echo -e "${BLUE}[2/5] Removing old image...${NC}"
-if docker images --format '{{.Repository}}:{{.Tag}}' | grep -q "^${IMAGE_NAME}"; then
-    OLD_IMAGE_ID=$(docker images --format '{{.ID}}' ${IMAGE_NAME}:latest 2>/dev/null || echo "")
-    if [ ! -z "$OLD_IMAGE_ID" ]; then
-        docker rmi ${IMAGE_NAME}:latest 2>/dev/null || true
-        echo -e "${GREEN}✓ Old image removed${NC}"
-    fi
-else
-    echo -e "${YELLOW}  No existing image found${NC}"
-fi
-echo ""
-
-# Step 3: Build new image
-echo -e "${BLUE}[3/5] Building new Docker image...${NC}"
-docker build -t ${IMAGE_NAME}:latest . --no-cache
-
-if [ $? -eq 0 ]; then
-    # Get image size
-    IMAGE_SIZE=$(docker images ${IMAGE_NAME}:latest --format "{{.Size}}")
-    echo -e "${GREEN}✓ Image built successfully (Size: ${IMAGE_SIZE})${NC}"
-else
-    echo -e "${RED}✗ Image build failed${NC}"
+    echo -e "${RED}[ERROR] Docker Compose not available${NC}"
     exit 1
 fi
+
+echo -e "${GREEN}[OK] Using: $COMPOSE_CMD${NC}"
 echo ""
 
-# Step 4: Start the container
-echo -e "${BLUE}[4/5] Starting container...${NC}"
-docker run -d \
-    --name ${CONTAINER_NAME} \
-    --restart unless-stopped \
-    --network host \
-    --env-file .env \
-    ${IMAGE_NAME}:latest
+# Step 1: Stop and remove existing services
+echo -e "${BLUE}[1/5] Stopping existing services...${NC}"
+$COMPOSE_CMD down 2>/dev/null || true
+echo -e "${GREEN}✓ Services stopped${NC}"
+echo ""
+
+# Step 2: Remove old images
+echo -e "${BLUE}[2/5] Removing old images...${NC}"
+if docker images --format '{{.Repository}}:{{.Tag}}' | grep -q "^${IMAGE_NAME}"; then
+    docker rmi ${IMAGE_NAME}:latest 2>/dev/null || true
+    echo -e "${GREEN}✓ Old images removed${NC}"
+else
+    echo -e "${YELLOW}  No existing images found${NC}"
+fi
+echo ""
+
+# Step 3: Build and start with docker-compose
+echo -e "${BLUE}[3/5] Building and starting with docker compose...${NC}"
+
+# Build and start with docker-compose (uses docker-compose.yml configuration)
+$COMPOSE_CMD up -d --build --force-recreate
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Container started successfully${NC}"
+    echo -e "${GREEN}✓ Container built and started successfully${NC}"
 
     # Wait a moment for the container to initialize
-    sleep 2
+    sleep 3
 
     # Check if container is running
     if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo -e "${GREEN}✓ Container is running${NC}"
+
+        # Show image size
+        IMAGE_SIZE=$(docker images ${IMAGE_NAME}:latest --format "{{.Size}}")
+        echo -e "${GREEN}✓ Image size: ${IMAGE_SIZE}${NC}"
     else
         echo -e "${RED}✗ Container stopped unexpectedly${NC}"
         echo ""
@@ -106,7 +99,7 @@ if [ $? -eq 0 ]; then
         exit 1
     fi
 else
-    echo -e "${RED}✗ Failed to start container${NC}"
+    echo -e "${RED}✗ Failed to build/start container${NC}"
     exit 1
 fi
 echo ""
@@ -141,10 +134,11 @@ echo "  URL: http://localhost:${SERVER_PORT}"
 echo ""
 
 echo -e "${BLUE}Useful Commands:${NC}"
-echo "  View logs:       docker logs -f ${CONTAINER_NAME}"
-echo "  Stop:            docker stop ${CONTAINER_NAME}"
-echo "  Restart:         docker restart ${CONTAINER_NAME}"
+echo "  View logs:       $COMPOSE_CMD logs -f"
+echo "  Stop:            $COMPOSE_CMD down"
+echo "  Restart:         $COMPOSE_CMD restart"
 echo "  Shell access:    docker exec -it ${CONTAINER_NAME} sh"
+echo "  View ports:      docker ps --format 'table {{.Names}}\t{{.Ports}}'"
 echo ""
 
 # Test the application
