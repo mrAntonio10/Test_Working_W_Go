@@ -58,7 +58,16 @@ echo ""
 
 # Step 1: Stop and remove existing services
 echo -e "${BLUE}[1/5] Stopping existing services...${NC}"
-$COMPOSE_CMD down 2>/dev/null || true
+
+# First, force remove any existing container with the same name
+if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "  → Removing existing container: ${CONTAINER_NAME}"
+    docker stop ${CONTAINER_NAME} 2>/dev/null || true
+    docker rm -f ${CONTAINER_NAME} 2>/dev/null || true
+fi
+
+# Then run docker compose down
+$COMPOSE_CMD down --remove-orphans 2>/dev/null || true
 echo -e "${GREEN}✓ Services stopped${NC}"
 echo ""
 
