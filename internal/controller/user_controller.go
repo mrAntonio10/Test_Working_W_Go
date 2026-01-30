@@ -2,6 +2,7 @@ package controller
 
 import (
 	"first/internal/core"
+	"first/pkg/utils"
 	"net/http"
 	"strconv"
 
@@ -65,6 +66,18 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+type LoginResponse struct {
+	Message string   `json:"message"`
+	Token   string   `json:"token"`
+	User    UserData `json:"user"`
+}
+
+type UserData struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
 func (ctrl *UserController) Login(c echo.Context) error {
 	var req LoginRequest
 	if err := c.Bind(&req); err != nil {
@@ -80,5 +93,22 @@ func (ctrl *UserController) Login(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid credentials"})
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{"message": "Login successful"})
+	// Generate JWT token
+	token, err := utils.GenerateJWT(user.ID, user.Email)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to generate token"})
+	}
+
+	// Prepare response
+	response := LoginResponse{
+		Message: "Login successful",
+		Token:   token,
+		User: UserData{
+			ID:    user.ID.String(),
+			Name:  user.Name,
+			Email: user.Email,
+		},
+	}
+
+	return c.JSON(http.StatusOK, response)
 }

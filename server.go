@@ -38,6 +38,14 @@ func main() {
 
 	// 2. Setup Echo Server
 	e := echo.New()
+
+	// Global CORS middleware
+	e.Use(echoMiddleware.CORSWithConfig(echoMiddleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.OPTIONS},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+	}))
+
 	e.Use(echoMiddleware.Logger())
 	e.Use(echoMiddleware.Recover())
 
