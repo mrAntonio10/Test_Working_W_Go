@@ -22,11 +22,11 @@ func main() {
 	// 1. Connection to PostgreSQL
 	// Build DSN from environment variables
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		getEnv("DB_USER", "postgres"),
-		getEnv("DB_PASSWORD", ""),
+		getEnv("DB_USER", "marcoro"),
+		getEnv("DB_PASSWORD", "4708"),
 		getEnv("DB_HOST", "localhost"),
 		getEnv("DB_PORT", "5432"),
-		getEnv("DB_NAME", "postgres"),
+		getEnv("DB_NAME", "own_assistant"),
 		getEnv("DB_SSLMODE", "disable"),
 	)
 
