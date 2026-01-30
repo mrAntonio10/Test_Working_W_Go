@@ -1,14 +1,21 @@
 package utils
 
 import (
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
-// TODO: Move this to environment variable for production
-const jwtSecretKey = "your-secret-key-change-this-in-production"
+// getJWTSecretKey retrieves the JWT secret key from environment variable
+func getJWTSecretKey() string {
+	key := os.Getenv("JWT_SECRET_KEY")
+	if key == "" {
+		panic("JWT_SECRET_KEY environment variable is required")
+	}
+	return key
+}
 
 type JWTClaims struct {
 	UserID uuid.UUID `json:"user_id"`
@@ -30,7 +37,7 @@ func GenerateJWT(userID uuid.UUID, email string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(jwtSecretKey))
+	tokenString, err := token.SignedString([]byte(getJWTSecretKey()))
 	if err != nil {
 		return "", err
 	}
@@ -43,7 +50,7 @@ func ValidateJWT(tokenString string) (*JWTClaims, error) {
 	claims := &JWTClaims{}
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(jwtSecretKey), nil
+		return []byte(getJWTSecretKey()), nil
 	})
 
 	if err != nil {
