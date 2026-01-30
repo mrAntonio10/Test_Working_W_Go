@@ -20,6 +20,7 @@ vendor/
 # Build output
 /dist/
 /build/
+/bin/
 
 # IDE - VSCode
 .vscode/*
@@ -56,6 +57,10 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
+
+# SQL backups
+backup*.sql
+*.backup
 
 # Temporary files
 tmp/

@@ -20,14 +20,21 @@ func main() {
 	}
 
 	// 1. Connection to PostgreSQL
-	// Build DSN from environment variables
+	// Build DSN from environment variables (all required)
+	dbUser := getRequiredEnv("DB_USER")
+	dbPassword := getRequiredEnv("DB_PASSWORD")
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "5432")
+	dbName := getRequiredEnv("DB_NAME")
+	dbSSLMode := getEnv("DB_SSLMODE", "disable")
+
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		getEnv("DB_USER", "marcoro"),
-		getEnv("DB_PASSWORD", "4708"),
-		getEnv("DB_HOST", "localhost"),
-		getEnv("DB_PORT", "5432"),
-		getEnv("DB_NAME", "own_assistant"),
-		getEnv("DB_SSLMODE", "disable"),
+		dbUser,
+		dbPassword,
+		dbHost,
+		dbPort,
+		dbName,
+		dbSSLMode,
 	)
 
 	database, err := db.NewPostgresDB(dsn)
@@ -71,4 +78,13 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getRequiredEnv gets a required environment variable or panics if not set
+func getRequiredEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("ERROR: Required environment variable %s is not set. Please check your .env file", key)
+	}
+	return value
 }
