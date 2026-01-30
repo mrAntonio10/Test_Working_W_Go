@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	m "first/internal/model"
 	"first/internal/repository"
 	"first/pkg/utils"
