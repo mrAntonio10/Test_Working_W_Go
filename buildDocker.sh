@@ -50,14 +50,15 @@ echo ""
 # echo ""
 
 # Build the application
-echo -e "${YELLOW}→ Building application...${NC}"
+echo -e "${YELLOW}→ Building application for Linux/Ubuntu...${NC}"
 OUTPUT_BINARY="./bin/server"
 
 # Create bin directory if it doesn't exist
 mkdir -p ./bin
 
-# Build with optimizations
-go build -ldflags="-s -w" -o ${OUTPUT_BINARY} server.go
+# Build with optimizations for Linux (Ubuntu)
+# GOOS=linux ensures the binary will run on Ubuntu servers
+GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ${OUTPUT_BINARY} server.go
 
 if [ -f "${OUTPUT_BINARY}" ]; then
     echo -e "${GREEN}✓ Build successful!${NC}"
