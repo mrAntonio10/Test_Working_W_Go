@@ -1,280 +1,166 @@
 #!/bin/bash
 
-# Deploy script for Ubuntu/Linux
-# This script manages Docker deployment of the Go backend
+# Optimized Deploy Script for Ubuntu
+# This script builds, deploys and cleans up Docker images efficiently
 
 set -e  # Exit on any error
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Script banner
+# Configuration
+IMAGE_NAME="test_working_w_go-app"
+CONTAINER_NAME="first-app"
+
 echo -e "${BLUE}================================================${NC}"
-echo -e "${BLUE}  Go Backend - Docker Deployment (Ubuntu)${NC}"
+echo -e "${BLUE}  Go Backend - Optimized Docker Deploy${NC}"
 echo -e "${BLUE}================================================${NC}"
 echo ""
 
-# Check if Docker is installed
+# Check Docker
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}[ERROR] Docker is not installed.${NC}"
-    echo "Install Docker with:"
-    echo "  curl -fsSL https://get.docker.com -o get-docker.sh"
-    echo "  sudo sh get-docker.sh"
-    echo "  sudo usermod -aG docker \$USER"
+    echo -e "${RED}[ERROR] Docker is not installed${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}[OK] Docker is installed${NC}"
+echo -e "${GREEN}[OK] Docker is available${NC}"
 
-# Check if docker-compose is available
-COMPOSE_CMD=""
-if command -v docker-compose &> /dev/null; then
-    COMPOSE_CMD="docker-compose"
-elif docker compose version &> /dev/null 2>&1; then
-    COMPOSE_CMD="docker compose"
-else
-    echo -e "${RED}[ERROR] Docker Compose is not available.${NC}"
-    echo "Install Docker Compose with:"
-    echo "  sudo apt-get update"
-    echo "  sudo apt-get install docker-compose-plugin"
-    exit 1
-fi
-
-echo -e "${GREEN}[OK] Docker Compose is available (using: $COMPOSE_CMD)${NC}"
-echo ""
-
-# Check if .env file exists
+# Check .env file
 if [ ! -f .env ]; then
     echo -e "${YELLOW}[WARNING] .env file not found${NC}"
-    echo -e "${YELLOW}Creating .env from .env.example...${NC}"
+    echo "Creating .env from .env.example..."
     cp .env.example .env
     echo ""
-    echo -e "${YELLOW}================================================${NC}"
-    echo -e "${YELLOW}  IMPORTANT: Configure your .env file!${NC}"
-    echo -e "${YELLOW}================================================${NC}"
-    echo ""
-    echo "Edit .env with your database credentials:"
-    echo "  nano .env"
-    echo "  # or"
-    echo "  vim .env"
-    echo ""
-    echo "Then run this script again."
+    echo -e "${YELLOW}Please configure .env and run again${NC}"
     exit 0
 fi
 
 echo -e "${GREEN}[OK] .env file found${NC}"
 echo ""
 
-# Show menu
-show_menu() {
-    echo -e "${BLUE}Select an option:${NC}"
-    echo ""
-    echo "  ${GREEN}1${NC}. Deploy services (docker-compose up)"
-    echo "  ${GREEN}2${NC}. Stop services"
-    echo "  ${GREEN}3${NC}. View logs"
-    echo "  ${GREEN}4${NC}. Rebuild and deploy"
-    echo "  ${GREEN}5${NC}. Service status"
-    echo "  ${GREEN}6${NC}. Database backup"
-    echo "  ${GREEN}7${NC}. Database restore"
-    echo "  ${GREEN}8${NC}. Clean all (WARNING: deletes data)"
-    echo "  ${GREEN}9${NC}. Build locally (without Docker)"
-    echo "  ${YELLOW}0${NC}. Exit"
-    echo ""
-}
+# Step 1: Stop and remove existing container
+echo -e "${BLUE}[1/5] Stopping and removing old container...${NC}"
+if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    docker stop ${CONTAINER_NAME} 2>/dev/null || true
+    docker rm ${CONTAINER_NAME} 2>/dev/null || true
+    echo -e "${GREEN}✓ Old container removed${NC}"
+else
+    echo -e "${YELLOW}  No existing container found${NC}"
+fi
+echo ""
 
-# Deploy function
-deploy() {
-    echo -e "${BLUE}[INFO] Deploying services...${NC}"
-    $COMPOSE_CMD up -d
+# Step 2: Remove old image
+echo -e "${BLUE}[2/5] Removing old image...${NC}"
+if docker images --format '{{.Repository}}:{{.Tag}}' | grep -q "^${IMAGE_NAME}"; then
+    OLD_IMAGE_ID=$(docker images --format '{{.ID}}' ${IMAGE_NAME}:latest 2>/dev/null || echo "")
+    if [ ! -z "$OLD_IMAGE_ID" ]; then
+        docker rmi ${IMAGE_NAME}:latest 2>/dev/null || true
+        echo -e "${GREEN}✓ Old image removed${NC}"
+    fi
+else
+    echo -e "${YELLOW}  No existing image found${NC}"
+fi
+echo ""
 
-    if [ $? -eq 0 ]; then
-        echo ""
-        echo -e "${GREEN}================================================${NC}"
-        echo -e "${GREEN}  Services deployed successfully!${NC}"
-        echo -e "${GREEN}================================================${NC}"
-        echo ""
-        echo "Application URL: http://localhost:1323"
-        echo ""
-        echo "View logs with:"
-        echo "  $COMPOSE_CMD logs -f"
-        echo ""
+# Step 3: Build new image
+echo -e "${BLUE}[3/5] Building new Docker image...${NC}"
+docker build -t ${IMAGE_NAME}:latest . --no-cache
+
+if [ $? -eq 0 ]; then
+    # Get image size
+    IMAGE_SIZE=$(docker images ${IMAGE_NAME}:latest --format "{{.Size}}")
+    echo -e "${GREEN}✓ Image built successfully (Size: ${IMAGE_SIZE})${NC}"
+else
+    echo -e "${RED}✗ Image build failed${NC}"
+    exit 1
+fi
+echo ""
+
+# Step 4: Start the container
+echo -e "${BLUE}[4/5] Starting container...${NC}"
+docker run -d \
+    --name ${CONTAINER_NAME} \
+    --restart unless-stopped \
+    --network host \
+    --env-file .env \
+    ${IMAGE_NAME}:latest
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ Container started successfully${NC}"
+
+    # Wait a moment for the container to initialize
+    sleep 2
+
+    # Check if container is running
+    if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo -e "${GREEN}✓ Container is running${NC}"
     else
-        echo -e "${RED}[ERROR] Deployment failed${NC}"
+        echo -e "${RED}✗ Container stopped unexpectedly${NC}"
+        echo ""
+        echo "Container logs:"
+        docker logs ${CONTAINER_NAME}
         exit 1
     fi
-}
+else
+    echo -e "${RED}✗ Failed to start container${NC}"
+    exit 1
+fi
+echo ""
 
-# Stop function
-stop_services() {
-    echo -e "${BLUE}[INFO] Stopping services...${NC}"
-    $COMPOSE_CMD down
+# Step 5: Clean up unused images
+echo -e "${BLUE}[5/5] Cleaning up unused Docker images...${NC}"
+docker image prune -f > /dev/null 2>&1
 
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}[SUCCESS] Services stopped${NC}"
-    fi
-}
+# Also remove dangling images
+DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l)
+if [ "$DANGLING" -gt 0 ]; then
+    docker rmi $(docker images -f "dangling=true" -q) 2>/dev/null || true
+    echo -e "${GREEN}✓ Removed $DANGLING dangling image(s)${NC}"
+else
+    echo -e "${GREEN}✓ No dangling images to remove${NC}"
+fi
+echo ""
 
-# Logs function
-view_logs() {
-    echo -e "${BLUE}[INFO] Showing logs (Ctrl+C to exit)...${NC}"
-    echo ""
-    $COMPOSE_CMD logs -f
-}
+# Show final status
+echo -e "${GREEN}================================================${NC}"
+echo -e "${GREEN}  Deployment Completed Successfully!${NC}"
+echo -e "${GREEN}================================================${NC}"
+echo ""
+echo -e "${BLUE}Container Status:${NC}"
+docker ps --filter name=${CONTAINER_NAME} --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+echo ""
 
-# Rebuild function
-rebuild() {
-    echo -e "${BLUE}[INFO] Rebuilding and deploying services...${NC}"
-    $COMPOSE_CMD up -d --build
+echo -e "${BLUE}Application Info:${NC}"
+SERVER_PORT=$(grep SERVER_PORT .env | cut -d '=' -f2)
+SERVER_PORT=${SERVER_PORT:-1323}
+echo "  URL: http://localhost:${SERVER_PORT}"
+echo ""
 
-    if [ $? -eq 0 ]; then
-        echo ""
-        echo -e "${GREEN}[SUCCESS] Services rebuilt and deployed!${NC}"
-        echo ""
-        echo "Application URL: http://localhost:1323"
-    fi
-}
+echo -e "${BLUE}Useful Commands:${NC}"
+echo "  View logs:       docker logs -f ${CONTAINER_NAME}"
+echo "  Stop:            docker stop ${CONTAINER_NAME}"
+echo "  Restart:         docker restart ${CONTAINER_NAME}"
+echo "  Shell access:    docker exec -it ${CONTAINER_NAME} sh"
+echo ""
 
-# Status function
-show_status() {
-    echo -e "${BLUE}[INFO] Service status:${NC}"
-    echo ""
-    $COMPOSE_CMD ps
-    echo ""
-    echo -e "${BLUE}[INFO] Container stats:${NC}"
-    echo ""
-    docker stats --no-stream
-}
+# Test the application
+echo -e "${BLUE}Testing application...${NC}"
+sleep 1
+if curl -s http://localhost:${SERVER_PORT}/ > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Application is responding!${NC}"
+else
+    echo -e "${YELLOW}⚠ Application might still be starting up${NC}"
+    echo "  Check logs with: docker logs -f ${CONTAINER_NAME}"
+fi
+echo ""
 
-# Backup function
-backup_database() {
-    echo -e "${BLUE}[INFO] Creating database backup...${NC}"
+# Show disk usage
+echo -e "${BLUE}Docker Disk Usage:${NC}"
+docker system df
+echo ""
 
-    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    BACKUP_FILE="backup_${TIMESTAMP}.sql"
-
-    $COMPOSE_CMD exec -T postgres pg_dump -U postgres own_assistant > "$BACKUP_FILE"
-
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}[SUCCESS] Backup created: ${BACKUP_FILE}${NC}"
-
-        # Show file size
-        SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
-        echo "Backup size: $SIZE"
-    else
-        echo -e "${RED}[ERROR] Backup failed${NC}"
-    fi
-}
-
-# Restore function
-restore_database() {
-    echo -e "${YELLOW}[WARNING] This will restore the database from backup.sql${NC}"
-    read -p "Are you sure? (y/N): " -n 1 -r
-    echo
-
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if [ ! -f backup.sql ]; then
-            echo -e "${RED}[ERROR] backup.sql file not found${NC}"
-            return 1
-        fi
-
-        echo -e "${BLUE}[INFO] Restoring database...${NC}"
-        $COMPOSE_CMD exec -T postgres psql -U postgres own_assistant < backup.sql
-
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}[SUCCESS] Database restored${NC}"
-        else
-            echo -e "${RED}[ERROR] Restore failed${NC}"
-        fi
-    else
-        echo -e "${BLUE}[INFO] Restore cancelled${NC}"
-    fi
-}
-
-# Clean function
-clean_all() {
-    echo -e "${RED}================================================${NC}"
-    echo -e "${RED}  WARNING: This will DELETE ALL DATA!${NC}"
-    echo -e "${RED}================================================${NC}"
-    echo ""
-    echo "This will remove:"
-    echo "  - All containers"
-    echo "  - All volumes (DATABASE DATA)"
-    echo "  - All images"
-    echo ""
-    read -p "Are you absolutely sure? (type 'yes' to confirm): " -r
-
-    if [ "$REPLY" = "yes" ]; then
-        echo ""
-        echo -e "${BLUE}[INFO] Cleaning everything...${NC}"
-        $COMPOSE_CMD down -v
-        docker rmi first-go-app 2>/dev/null || true
-        echo -e "${GREEN}[SUCCESS] Cleanup completed${NC}"
-    else
-        echo -e "${BLUE}[INFO] Cleanup cancelled${NC}"
-    fi
-}
-
-# Local build function
-build_local() {
-    echo -e "${BLUE}[INFO] Building locally (without Docker)...${NC}"
-
-    if [ ! -f build.sh ]; then
-        echo -e "${RED}[ERROR] build.sh not found${NC}"
-        return 1
-    fi
-
-    chmod +x build.sh
-    ./build.sh
-}
-
-# Main loop
-while true; do
-    show_menu
-    read -p "Option: " choice
-    echo ""
-
-    case $choice in
-        1)
-            deploy
-            ;;
-        2)
-            stop_services
-            ;;
-        3)
-            view_logs
-            ;;
-        4)
-            rebuild
-            ;;
-        5)
-            show_status
-            ;;
-        6)
-            backup_database
-            ;;
-        7)
-            restore_database
-            ;;
-        8)
-            clean_all
-            ;;
-        9)
-            build_local
-            ;;
-        0)
-            echo -e "${BLUE}Goodbye!${NC}"
-            exit 0
-            ;;
-        *)
-            echo -e "${RED}[ERROR] Invalid option${NC}"
-            ;;
-    esac
-
-    echo ""
-    read -p "Press Enter to continue..."
-    echo ""
-done
+echo -e "${GREEN}Done! Your application is running.${NC}"
